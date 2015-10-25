@@ -118,11 +118,12 @@ class GridClusterBuilder(object):
                 cluster = Cluster(cluster_pts, self)
                 ratio = cluster.ratio()
                 area = cluster.area()
-                print "MET cluster(area=%.2f, ratio=%s, pts=%d)"%(area,
-                                                                  ("%.2f"%ratio)
-                                                                    if ratio is not None
-                                                                    else ratio,
-                                                                  len(cluster_pts))
+                if len(cluster_pts) > 1:
+                    print "MET cluster(area=%.2f, ratio=%s, pts=%d)"%(area,
+                                                                      ("%.2f"%ratio)
+                                                                        if ratio is not None
+                                                                        else ratio,
+                                                                      len(cluster_pts))
 
                 if low_area <= cluster.area() <= high_area and \
                    ratio is not None and \
@@ -141,7 +142,25 @@ if __name__ == '__main__':
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     kernel = np.ones((10, 10), np.uint8)
 
-    new_hsv = cv2.inRange(hsv, np.array([20, 20, 140]), np.array([60, 255, 255]))
+    normal_canny = cv2.Canny(img.copy(), 60, 60)
+    cv2.imwrite("/home/algy/cvd/nc.jpg", normal_canny)
+    hough = normal_canny.copy()
+    lines = cv2.HoughLines(hough, 10, np.pi / 180, 300)
+    
+    if lines is not None:
+        for rho, theta in lines[0]:
+            a = np.cos(theta)
+            b = np.sin(theta)
+            x0 = a*rho
+            y0 = b*rho
+            x1 = int(x0 + 1000*(-b))   # Here i have used int() instead of rounding the decimal value, so 3.8 --> 3
+            y1 = int(y0 + 1000*(a))    # But if you want to round the number, then use np.around() function, then 3.8 --> 4.0
+            x2 = int(x0 - 1000*(-b))   # But we need integers, so use int() function after that, ie int(np.around(x))
+            y2 = int(y0 - 1000*(a))
+
+            cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 1)
+
+    new_hsv = cv2.inRange(hsv, np.array([20, 20, 160]), np.array([60, 255, 255]))
     cv2.imwrite("/home/algy/cvd/threshold.jpg", new_hsv)
     new_hsv = cv2.morphologyEx(new_hsv, cv2.MORPH_OPEN, kernel)
     cv2.imwrite("/home/algy/cvd/open.jpg", new_hsv)
@@ -164,15 +183,4 @@ if __name__ == '__main__':
         cv2.imwrite("/home/algy/cvd/canny_%d.jpg"%idx, cropped)
         cropped = cv2.GaussianBlur(cropped, (15, 15), 0)
         cv2.imwrite("/home/algy/cvd/blurred_%d.jpg"%idx, cropped)
-        hough = cropped.copy()
-        lines = cv2.HoughLinesP(hough, 1, np.pi / 180, 300, 300, 80)
-        
-        if lines is not None:
-            for x1, y1, x2, y2 in lines[0]:
-                x1 += st_x
-                x2 += st_x
-                y1 += st_y
-                y2 += st_y
-
-                cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
     cv2.imwrite(dest, img)
