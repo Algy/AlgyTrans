@@ -2,7 +2,7 @@
 import sys
 import numpy as np
 import cv2
-from persp import totori_affine_wrap
+from persp import totori_affine_warp
 
 
 def plus_diag_range(width, height, reverse=False):
@@ -85,7 +85,7 @@ def fill(pinpoint_img, img, cannied):
 
         print "EXTRACTING DONE %d, %s"%(inc, repr(indices))
         cv2.imwrite("/home/algy/cvd/flooded_%d.jpg"%inc, gray)
-        warp = totori_affine_wrap(img, indices, minus_one=True)
+        warp = totori_affine_warp(img, indices, minus_one=True)
         inc += 1
         if FLOODFILL_MAGIC + inc == 255:
             mask = make_mask()
@@ -121,31 +121,49 @@ if __name__ == '__main__':
 
     for idx, warp in enumerate(fill(pinpoint_img, img, cannied)):
         cv2.imwrite("/home/algy/cvd/warp_%d.jpg"%idx, warp)
-        tb, bb = int(warp.shape[0] * 0.), int(warp.shape[0] * 0.886)
-        lb, rb = int(warp.shape[1] * 0.011), int(warp.shape[1] * 0.924)
+        tb, bb = int(warp.shape[0] * 0.), int(warp.shape[0] * 1)
+        lb, rb = int(warp.shape[1] * 0.011), int(warp.shape[1] * 0.964)
         if lb >= rb or tb >= bb:
             continue
         warp = warp[tb:bb, lb:rb]
         gray_warp = cv2.cvtColor(warp, cv2.COLOR_BGR2GRAY)
         print "Thresholding..."
-        _, warp = cv2.threshold(gray_warp,
-                                0,
-                                255,
-                                cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        warp = cv2.adaptiveThreshold(
+            gray_warp,
+            255,
+            cv2.ADAPTIVE_THRESH_MEAN_C,
+            cv2.THRESH_BINARY_INV,
+            11,
+            3)
         cv2.imwrite("/home/algy/cvd/before_clean_%d.jpg"%idx, warp)
         print "Done..."
         print "Cleaning..."
         kernel = np.ones((2, 2), np.uint8)
-        warp = cv2.morphologyEx(warp, cv2.MORPH_OPEN, kernel)
+        warp = cv2.morphologyEx(warp, cv2.MORPH_OPEN, kernel, iterations=2)
         cv2.imwrite("/home/algy/cvd/warp_pre_morph_%d.jpg"%idx, warp)
-        cv2.floodFill(warp, None, (0, 0), 0, flags=8)
-        cv2.floodFill(warp, None, (warp.shape[1] - 1, 0), 0, flags=4)
+
+        '''
+        if warp[0, 0] != 0:
+            cv2.floodFill(warp, None, (0, 0), 0, flags=8)
+
+        if warp[0, warp.shape[1] - 1] != 0:
+            cv2.floodFill(warp, None, (warp.shape[1] - 1, 0), 0, flags=4)
+
+        if warp[warp.shape[0] - 1, warp.shape[1] - 1] != 0:
+            cv2.floodFill(warp, None, (warp.shape[1] - 1, warp.shape[0] - 1), 0, flags=4)
+
+        if warp[warp.shape[0] - 1, 0] != 0:
+            cv2.floodFill(warp, None, (0, warp.shape[0] - 1), 0, flags=4)
+
         kernel = np.ones((2, 2), np.uint8)
         warp = cv2.morphologyEx(warp, cv2.MORPH_OPEN, kernel)
-        print "Done..."
-        kernel = np.ones((2, 2), np.uint8)
-        print "Morphing..."
-        warp = cv2.morphologyEx(warp, cv2.MORPH_OPEN, kernel)
+
+        for x, y in plus_diag_range(warp.shape[1], warp.shape[0]):
+            if warp[y, x] != 0:
+                warp[:, :x / 2] = 0
+                warp[:y / 2, :] = 0
+                break
+        '''
         print "Done..."
         cv2.imwrite("/home/algy/cvd/text_%d.jpg"%idx, warp)
         print "IDX %d"%idx
