@@ -76,10 +76,12 @@ def fill(pinpoint_img, img, cannied):
                     indices.append([x, y])
                     break
         indices = np.array(indices, np.int32)
+        '''
         for idx in range(-1, len(indices) - 1):
             p1 = indices[idx]
             p2 = indices[idx + 1]
             cv2.line(img, tuple(p1), tuple(p2), (0, 255, 0), 2)
+        '''
 
         print "EXTRACTING DONE %d, %s"%(inc, repr(indices))
         cv2.imwrite("/home/algy/cvd/flooded_%d.jpg"%inc, gray)
@@ -119,7 +121,7 @@ if __name__ == '__main__':
 
     for idx, warp in enumerate(fill(pinpoint_img, img, cannied)):
         cv2.imwrite("/home/algy/cvd/warp_%d.jpg"%idx, warp)
-        tb, bb = int(warp.shape[0] * .114), int(warp.shape[0] * 0.886)
+        tb, bb = int(warp.shape[0] * 0.), int(warp.shape[0] * 0.886)
         lb, rb = int(warp.shape[1] * 0.011), int(warp.shape[1] * 0.924)
         if lb >= rb or tb >= bb:
             continue
@@ -130,6 +132,16 @@ if __name__ == '__main__':
                                 0,
                                 255,
                                 cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        cv2.imwrite("/home/algy/cvd/before_clean_%d.jpg"%idx, warp)
+        print "Done..."
+        print "Cleaning..."
+        kernel = np.ones((2, 2), np.uint8)
+        warp = cv2.morphologyEx(warp, cv2.MORPH_OPEN, kernel)
+        cv2.imwrite("/home/algy/cvd/warp_pre_morph_%d.jpg"%idx, warp)
+        cv2.floodFill(warp, None, (0, 0), 0, flags=8)
+        cv2.floodFill(warp, None, (warp.shape[1] - 1, 0), 0, flags=4)
+        kernel = np.ones((2, 2), np.uint8)
+        warp = cv2.morphologyEx(warp, cv2.MORPH_OPEN, kernel)
         print "Done..."
         kernel = np.ones((2, 2), np.uint8)
         print "Morphing..."
