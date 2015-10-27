@@ -2,7 +2,6 @@
 import sys
 import numpy as np
 import cv2
-
 from persp import totori_affine_wrap
 
 
@@ -34,9 +33,12 @@ def fill(pinpoint_img, img, cannied):
     '''
     (warpped_img) generator
     '''
-    mask = cv2.copyMakeBorder(cannied, 1, 1, 1, 1, cv2.BORDER_REPLICATE)
-    mask[mask != 0] = 255
+    def make_mask():
+        mask = cv2.copyMakeBorder(cannied, 1, 1, 1, 1, cv2.BORDER_REPLICATE)
+        mask[mask != 0] = 255
+        return mask
 
+    mask = make_mask()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     
@@ -54,12 +56,11 @@ def fill(pinpoint_img, img, cannied):
             continue
         print "%.2lf%%"%(float(idx) / length * 100.)
         magic = FLOODFILL_MAGIC + inc
-        inc += 1
-        flags = 8 | magic << 8 
+        flags = 4 | magic << 8 
         print "FLOOD FILLING %d"%inc
-        area, (rx, ry, rw, rh) = cv2.floodFill(gray, mask, pnt, 199, loDiff=(3, ), upDiff=(3,), flags=flags)
+        area, (rx, ry, rw, rh) = cv2.floodFill(gray, mask, pnt, 199, loDiff=(9, ), upDiff=(9,), flags=flags)
         print "Done"
-        if not (0.01 <= float(area) / width / height <= 0.45):
+        if not (0.003 <= float(area) / width / height <= 0.45):
             continue
 
         indices = []
@@ -80,9 +81,13 @@ def fill(pinpoint_img, img, cannied):
             p2 = indices[idx + 1]
             cv2.line(img, tuple(p1), tuple(p2), (0, 255, 0), 2)
 
-        print "EXTRACTING DONE %d"%inc
+        print "EXTRACTING DONE %d, %s"%(inc, repr(indices))
         cv2.imwrite("/home/algy/cvd/flooded_%d.jpg"%inc, gray)
-        warp = totori_affine_wrap(img, indices, minus_one=1)
+        warp = totori_affine_wrap(img, indices, minus_one=True)
+        inc += 1
+        if FLOODFILL_MAGIC + inc == 255:
+            mask = make_mask()
+            inc = 0
         yield warp
 
 
@@ -92,11 +97,15 @@ if __name__ == '__main__':
 
 
     print "Cannying..."
-    cannied = cv2.Canny(img, 40, 60)
+    cannied = cv2.Canny(img, 20, 40)
     print "Done..."
     print "Blurring..."
-    cannied = cv2.GaussianBlur(cannied, (15, 15), 0)
+    cannied = cv2.GaussianBlur(cannied, (5, 5), 0)
+    cannied[cannied != 0] = 255
+    x = cv2.adaptiveThreshold(cannied, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 7, -64)
+    cannied = cv2.add(cannied, x)
     print "Done..."
+    cv2.imwrite("/home/algy/cvd/canny.jpg", cannied)
 
     height, width = img.shape[:2]
     hsv = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
@@ -128,6 +137,5 @@ if __name__ == '__main__':
         print "Done..."
         cv2.imwrite("/home/algy/cvd/text_%d.jpg"%idx, warp)
         print "IDX %d"%idx
-    cv2.imwrite("/home/algy/cvd/canny.jpg", cannied)
     cv2.imwrite("/home/algy/cvd/pinpoint.jpg", pinpoint_img)
     cv2.imwrite("/home/algy/cvd/a.jpg", img)
