@@ -3,9 +3,9 @@ CCFLAGS=-g -std=c++11
 LFLAGS=-lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_ml -lopencv_video -lopencv_features2d -lopencv_calib3d -lopencv_objdetect -lopencv_contrib -lopencv_legacy -lopencv_stitching
 
 
-all: test3.cpp
-	$(CCPLUS) $(CCFLAGS) $(LFLAGS) -o test3.out test3.cpp
+all: detector.cpp
+	$(CCPLUS) $(CCFLAGS) $(LFLAGS) -o detector.out detector.cpp
 
 
 clean:
-	rm -rf test.out
+	rm -rf detector.out
