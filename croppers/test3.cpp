@@ -23,6 +23,7 @@ private:
     map<string, string*> optNameStrRefMap; // long name -> string *
     map<string, int*> optNameIntRefMap; // long name -> int *
     map<string, bool*> optNameBoolRefMap; // long name -> bool *
+    map<string, double*> optNameDoubleRefMap; // long name -> double *
     map<string, string> optNameDescMap; // long name -> description
     vector<struct option> optStructs;
     bool optPadded = false;
@@ -58,6 +59,13 @@ private:
         return true;
     }
 
+    bool addOpt(string name, int has_arg, string desc, double* ref) {
+        if (!_addOpt(name, has_arg, desc))
+            return false;
+        optNameDoubleRefMap[name] = ref;
+        return true;
+    }
+
     bool postParse();
     bool parseOpt(int argc, char** argv) {
         if (!optPadded) {
@@ -88,6 +96,8 @@ private:
                 } else {
                     *ref = false;
                 }
+            } else if (optNameDoubleRefMap.find(name) != optNameDoubleRefMap.end()) {
+                *optNameDoubleRefMap[name] = atof(optarg);
             }
             if (!postParse())
                 return false;
@@ -121,6 +131,8 @@ public:
     int blurSize = 2;
     int kernelSize = 1;
     int gridCount = 50;
+
+    double maxRectRatio = 1.6;
     
     string _pinpointStr;
     cv::Scalar pinpointBegin = cv::Scalar(20, 20, 100);
@@ -139,6 +151,7 @@ public:
         addOpt("kernel-size", required_argument, "Size of kernel used in the dilate phase", &this->kernelSize);
         addOpt("grid-count", required_argument, "Count of grid edges in an axis", &this->gridCount);
         addOpt("pinpoint-range", required_argument, "Pinpoint range in HSV color space (e.g 20,20,100:60,150,255)", &this->_pinpointStr);
+        addOpt("max-rect-ratio", required_argument, "Rect ratio", &this->maxRectRatio);
         addOpt("verbose", required_argument, "Verbose mode", &this->verbose);
         addOpt("dbg-image", required_argument, "Path to which image footprint will be saved", &this->dbgFilename);
         addOpt("dbg-pinpoint-image", required_argument, "", &this->dbgPinpointFilename);
@@ -357,6 +370,53 @@ void Filler::iterPinpoint(int x, int y) {
 
 }
 
+bool getRectRatio(cv::Point* rect, double *outMRatio, double *outNRatio) {
+    auto lt = rect[0],
+         rt = rect[1],
+         rb = rect[2],
+         lb = rect[3];
+
+    auto diagA = rb - lt;
+    auto diagB = rt - lb;
+
+    cv::Mat A(2, 2, cv::DataType<double>::type);
+    A.at<double>(0, 0) = diagA.x;
+    A.at<double>(1, 0) = diagA.y;
+    A.at<double>(0, 1) = diagB.x;
+    A.at<double>(1, 1) = diagB.y;
+
+    cv::Mat b(2, 1, cv::DataType<double>::type);
+
+    b.at<double>(0, 0) = rt.x - lt.x;
+    b.at<double>(1, 0) = rt.y - lt.y;
+
+    cv::Mat resultMat;
+    if (!cv::solve(A, b, resultMat))
+        return false;
+    double m = resultMat.at<double>(0, 0);
+    double n = resultMat.at<double>(1, 0);
+
+    if (m > 0.5)
+        *outMRatio = m / (1 - m);
+    else
+        *outMRatio = (1 - m) / m;
+    if (n > 0.5)
+        *outNRatio = n / (1 - n);
+    else
+        *outNRatio = (1 - n) / n;
+    return true;
+}
+
+bool filterRect(cv::Point *rect) {
+    double mratio, nratio;
+    if (!getRectRatio(rect, &mratio, &nratio) ||
+        mratio > config.maxRectRatio ||
+        nratio > config.maxRectRatio) {
+        return false;
+    }
+    return true;
+}
+
 int main(int argc, char** argv) {
     config.loadFromArgv(argc, argv);
 
@@ -436,13 +496,17 @@ int main(int argc, char** argv) {
     }
 
     size_t length = filler.resultPoints.size();
-    cout << length << endl << endl;
     for (idx = 0; idx < length; idx++) {
+        if (!filterRect(&filler.resultBoxes[idx * 4])) {
+            continue;
+        }
+
         cv::Point pnt = filler.resultPoints[idx];
         cout << "[" << pnt.x << ", " << pnt.y << "]" << endl;
 
         if (dbgOut)
             cv::circle(img, pnt, 3, cv::Scalar(0, 0, 255), 3);
+
         for (kdx = 0; kdx < 4; kdx++) {
             cv::Point rectPnt = filler.resultBoxes[idx * 4 + kdx];
             cout << rectPnt.x << " " << rectPnt.y << endl;
