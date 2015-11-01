@@ -300,7 +300,7 @@ pldiag:
     int diff = sx - sy;
     for (k = diff + (rect.width - 1); k >= diff - (rect.height - 1); k--) {
         int xlimit = min(bottom + k, right);
-        for (x = max(sx, k); x < xlimit; x++) {
+        for (x = max(sx, k + sy); x < xlimit; x++) {
             if (iterFloodFill(x, x - k, magic, indices))
                 goto midiag;
         }
@@ -316,7 +316,7 @@ midiag:
 pldiag_reverse:
     for (k = diff - (rect.height - 1); k <= diff + (rect.width - 1); k++) {
         int xlimit = min(bottom + k, right);
-        for (x = max(sx, k); x < xlimit; x++) {
+        for (x = max(sx, k + sy); x < xlimit; x++) {
             if (iterFloodFill(x, x - k, magic, indices))
                 goto midiag_reverse;
         }
