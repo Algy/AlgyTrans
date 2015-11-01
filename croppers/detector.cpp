@@ -325,6 +325,53 @@ midiag_reverse:
     return true;
 }
 
+/*
+inline bool Filler::loopFloodFill(int magic, cv::Rect rect, vector<cv::Point>& indices) {
+    const int sx = rect.x, sy = rect.y;
+    int right = rect.x + rect.width;
+    int bottom = rect.y + rect.height;
+    bool entered = false;
+
+    int x, y;
+    for (x = sx; x < right; x++) {
+        for (y = sy; y < bottom; y++) {
+            if (iterFloodFill(x, y, magic, indices)) {
+                entered = true;
+                goto left;
+            }
+        }
+    }
+left:
+    if (!entered)
+        return false;
+    for (y = sy; y < bottom; y++) {
+        for (x = sx; x < right; x++) {
+            if (iterFloodFill(x, y, magic, indices)) {
+                goto top;
+            }
+        }
+    }
+top:
+    for (x = right - 1; x >= sx; x--) {
+        for (y = sy; y < bottom; y++) {
+            if (iterFloodFill(x, y, magic, indices)) {
+                goto right;
+            }
+        }
+    }
+right:
+    for (y = bottom - 1; y >= sy; y--) {
+        for (x = sx; x < right; x++) {
+            if (iterFloodFill(x, y, magic, indices)) {
+                goto bottom;
+            }
+        }
+    }
+bottom:
+    return true;
+}
+*/
+
 void Filler::iterPinpoint(int x, int y) {
     int idx;
     uchar maskPixel = mask.at<uchar>(y + 1, x + 1);
@@ -362,6 +409,14 @@ void Filler::iterPinpoint(int x, int y) {
     if (indices.size() < 4 || indices[0] == indices[1]) {
         return;
     }
+    if (cv::norm(indices[0] - indices[1]) > cv::norm(indices[1] - indices[2])) {
+        cv::Point tmp = indices[0];
+        indices[0] = indices[1];
+        indices[1] = indices[2];
+        indices[2] = indices[3];
+        indices[3] = tmp;
+    }
+
 
     resultPoints.push_back(cv::Point(x, y));
     for (idx = 0; idx < 4; idx++) {
@@ -434,7 +489,7 @@ int main(int argc, char** argv) {
 
     cv::Mat canniedImg;
     config.log("Cannying");
-    cv::Canny(img, canniedImg, config.cannyLevel / 2, config.cannyLevel);
+    cv::Canny(img, canniedImg, config.cannyLevel, config.cannyLevel);
     config.log("Done");
         
     if (config.blurSize > 0 || config.kernelSize > 0) {
