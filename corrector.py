@@ -81,6 +81,12 @@ def filter_kata_no(s):
         if is_kata(lb) or is_kata(la):
             return u"\u30CE" # katakana NO
     return replace_in(fn, s, u"/", 1, 1)
+
+def filter_hira_so(s):
+    def fn(chk, lb, la):
+        if is_hira(lb) or is_hira(la):
+            return u"\u305D" # hiragana so
+    return replace_in(fn, s, u"\\", 1, 1)
     
 
 def correct(s):
@@ -89,4 +95,5 @@ def correct(s):
     s = filter_wrong_ku(s)
     s = filter_wrong_kata(s)
     s = filter_kata_no(s)
+    s = filter_hira_so(s)
     return s

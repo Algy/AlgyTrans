@@ -58,12 +58,15 @@ if __name__ == '__main__':
     trans = build_trans()
 
     src = sys.stdin.read().decode("utf-8")
+    print "[Original]"
+    print src.encode("UTF-8")
     src = correct(src)
     orig, result = trans(src)
     if result is None:
         sys.exit(1)
     result = result.encode("utf-8")
 
+    print "[Translated]"
     sys.stdout.write(orig)
     sys.stdout.write("\n")
     sys.stdout.write(result)
