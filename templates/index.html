@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block body %}
+{# Here's for rectangle selector #}
+<div class='rect-canvas-wrapper'>
+    <ul class='tool-selector'>
+        <li class='active'><a class='tool-floodfill' href='#'>FloodFill</a></li>
+        <li><a class='tool-drop' href='#'>Drop Rectangle</a></li>
+        <li><a class='tool-move' href='#'>Move</a></li>
+    </ul>
+    <div><a class='tool-clear' href='#'>Clear</a></div>
+    <img class='mn-image' src='/mn.jpg' style='display: none'>
+    <canvas class='rect-canvas' width='1200' height='800'></canvas>
+    <ul class='warp-list'>
+        <li data-warp-id=''>
+            <img class='warp-image' href='//placehold.it/500x200'>
+            <button class='btn-warp-update'>Update</button>
+            <button class='btn-ocr'>OCR</button>
+            <div class='src-lang'>
+                Japanese
+            </div>
+            <div class='dest-lang'>
+                Korean
+            </div>
+        </li>
+    </ul>
+</div>
+<img class='canny' href='/mn_canny.jpg'>
+{% endblock %}
