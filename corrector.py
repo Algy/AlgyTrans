@@ -54,6 +54,8 @@ def filter_wrong_kata(s):
            u'\u30d3': u'\u3069',
            u'\u30ab': u'\u304b',
            u'\u30ac': u'\u304c',
+           u'\u30E3': u'\u3083',
+           u'\u30E4': u'\u3084',
             }
     for kata, hira in MAP.items():
         s = replace_in(partial(_look_kata, MAP), s, kata, 1, 1)
@@ -89,6 +91,9 @@ def filter_hira_so(s):
     return replace_in(fn, s, u"\\", 1, 1)
     
 
+def filter_ij(s):
+    return s.replace(u"ij", u"\u3044").replace(u"lj", u"\u3044").replace(u"fl", u"\u3066")
+
 def correct(s):
     s = filter_space(s)
     s = filter_noise_lines(s)
@@ -96,4 +101,5 @@ def correct(s):
     s = filter_wrong_kata(s)
     s = filter_kata_no(s)
     s = filter_hira_so(s)
+    s = filter_ij(s)
     return s
