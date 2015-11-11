@@ -127,14 +127,18 @@ private:
 
 public:
     string imageFilename;
+    string cannyInputFilename;
     int cannyLevel = 40;
     int blurSize = 2;
     int kernelSize = 1;
     int gridCount = 50;
 
-    double maxRectRatio = 1.6;
+    vector<cv::Point> seedPoints;
+
+    double maxRectRatio = 2000;
     
     string _pinpointStr;
+    string _seedPointStr;
     cv::Scalar pinpointBegin = cv::Scalar(20, 20, 100);
     cv::Scalar pinpointEnd = cv::Scalar(60, 150, 255);
 
@@ -146,6 +150,7 @@ public:
 public:
     Config() {
         addOpt("input", required_argument, "File name. If not specified, program reads an image from stdin", &this->imageFilename);
+        addOpt("canny-input", required_argument, "File name. Use cached canny.", &this->cannyInputFilename);
         addOpt("canny-level", required_argument, "Canny level", &this->cannyLevel);
         addOpt("blur-size", required_argument, "Size of kernel used in the gaussian blur phase", &this->blurSize);
         addOpt("kernel-size", required_argument, "Size of kernel used in the dilate phase", &this->kernelSize);
@@ -156,6 +161,7 @@ public:
         addOpt("dbg-image", required_argument, "Path to which image footprint will be saved", &this->dbgFilename);
         addOpt("dbg-pinpoint-image", required_argument, "", &this->dbgPinpointFilename);
         addOpt("dbg-canny-image", required_argument, "", &this->dbgCannyFilename);
+        addOpt("seed-point", required_argument, "", &this->_seedPointStr);
     }
 
     void loadFromArgv(int argc, char **argv) {
@@ -172,42 +178,71 @@ public:
 
 } config;
 
-bool Config::postParse() {
-    if (_pinpointStr == "") {
-        return true;
-    }
 
-    size_t idx = _pinpointStr.find(":");
-    if (idx == _pinpointStr.npos) {
-        return false;
-    }
-
-    string before = _pinpointStr.substr(0, idx);
-    string after = _pinpointStr.substr(idx + 1);
-
-    for (int k = 0; k <= 1; k++) {
-        cv::Scalar& dest = k == 0? pinpointBegin : pinpointEnd;
-        string& line = k == 0? before : after;
-
-        int cnt = 0;
-        int values[3];
-        int lastidx = 0;
-        int idx;
-        while (cnt < 3) {
-            idx = line.find(",", lastidx);
-            string part = line.substr(lastidx, idx - lastidx);
-            lastidx = idx + 1;
-            values[cnt++] = atoi(part.c_str());
-            if (idx == line.npos) {
-                break;
+bool parseVectors (string &str, vector< vector<int> > &result) {
+    size_t lastidx = 0;
+    while (1) {
+        size_t idx = str.find(":", lastidx);
+        string line = str.substr(lastidx, idx - lastidx);
+        lastidx = idx + 1;
+        vector<int> scalar;
+        {
+            size_t lastidx = 0;
+            while (1) {
+                size_t idx = line.find(",", lastidx);
+                string part = line.substr(lastidx, idx - lastidx);
+                lastidx = idx + 1;
+                char *endptr;
+                long long val = strtol(part.c_str(), &endptr, 10);
+                if (part == "" || *endptr)
+                    return false;
+                scalar.push_back((int)val);
+                if (idx == line.npos) {
+                    break;
+                }
             }
         }
-        if (cnt < 3 || idx != line.npos) {
-            return false;
-        }
-        dest = cv::Scalar(values[0], values[1], values[2]);
+        result.push_back(scalar);
+        if (idx == str.npos)
+            break;
     }
-    _pinpointStr = "";
+    return true;
+}
+
+bool Config::postParse() {
+    if (_pinpointStr != "") {
+        size_t idx;
+        vector< vector<int> > scalars;
+        if (!parseVectors(_pinpointStr, scalars))
+            return false;
+        if (scalars.size() < 2)
+            return false;
+        for (idx = 0; idx < 2; idx++) {
+            vector<int> &scalar = scalars[0];
+            if (scalar.size() < 3) {
+                return false;
+            }
+            cv::Scalar &dest = idx == 0? pinpointBegin : pinpointEnd;
+            dest = cv::Scalar(scalar[0], scalar[1], scalar[2]);
+        }
+        _pinpointStr = "";
+    }
+
+    if (_seedPointStr != "") {
+        size_t idx;
+        vector< vector<int> > points;
+        if (!parseVectors(_seedPointStr, points))
+            return false;
+
+        for (idx = 0; idx < points.size(); idx++) {
+            vector<int> &pt = points[idx];
+            if (pt.size() != 2) {
+                return false;
+            }
+            seedPoints.push_back(cv::Point(pt[0], pt[1]));
+        }
+        _seedPointStr = "";
+    }
     return true;
 }
 
@@ -260,6 +295,11 @@ void Filler::fill() {
             iterPinpoint(x, y);
         }
     }
+    int idx;
+    for (idx = 0; idx < config.seedPoints.size(); idx++) {
+        cv::Point& pt = config.seedPoints[idx];
+        iterPinpoint(pt.x, pt.y);
+    }
 }
 
 
@@ -275,10 +315,44 @@ inline bool Filler::loopFloodFill(int magic, cv::Rect rect, vector<cv::Point>& i
     config.log("EXTRACTING POINTS");
 
     bool entered = false;
-    int x, k;
+    int x, y, k;
     const int sx = rect.x, sy = rect.y;
     int right = rect.x + rect.width;
     int bottom = rect.y + rect.height;
+
+    // histogram
+    cv::Mat hist(rect.height, rect.width, cv::DataType<uchar>::type, (uchar)0);
+
+    vector<int> histArray;
+    for (x = sx; x < right; x++) {
+        long long sum = 0;
+        for (y = sy; y < bottom; y++) {
+            if (mask.at<uchar>(y + 1, x + 1) == magic) {
+                sum = rect.height - 1 - (y - sy);
+                break;
+            }
+        }
+        int level = (int)sum;
+        histArray.push_back(level);
+    }
+    // low-pass filter
+
+    double acc = histArray[0];
+    const double COEF = 0.85;
+    for (k = 1; k < histArray.size(); k++) {
+        acc = acc * COEF + histArray[k] * (1 - COEF);
+        histArray[k] = acc;
+    }
+
+    for (k = 0; k < hist.size().width; k++) {
+        cv::line(
+            hist,
+            cv::Point(k, hist.size().height - 1),
+            cv::Point(k, hist.size().height - 1 - histArray[k]),
+            cv::Scalar(255),
+            1);
+    }
+    cv::imwrite("/home/algy/cvd/hist.png", hist);
 
 
     // plus diag
@@ -397,8 +471,10 @@ void Filler::iterPinpoint(int x, int y) {
         width = img.size().width;
     long long origArea = width * height;
 
+/*
     if (!(origArea * 3LL / 1000LL <= area && area <= origArea * 45LL / 100LL))
         return;
+*/
 
     vector<cv::Point> indices;
     int k, sx, sy;
@@ -488,28 +564,35 @@ int main(int argc, char** argv) {
     }
 
     cv::Mat canniedImg;
-    config.log("Cannying");
-    cv::Canny(img, canniedImg, config.cannyLevel, config.cannyLevel);
-    config.log("Done");
-        
-    if (config.blurSize > 0 || config.kernelSize > 0) {
-        config.log("Blurring");
-        if (config.blurSize > 0) {
-            cv::GaussianBlur(
-                canniedImg,
-                canniedImg,
-                cv::Size(config.blurSize * 2 + 1, config.blurSize * 2 + 1),
-                0);
-            cv::threshold(canniedImg, canniedImg, 0, 255, cv::THRESH_BINARY);
+    if (config.cannyInputFilename == "") {
+        if (config.cannyLevel > 0) {
+            config.log("Cannying");
+            cv::Canny(img, canniedImg, config.cannyLevel, config.cannyLevel);
+            config.log("Done");
         }
-        if (config.kernelSize > 0) {
-            cv::Mat element = cv::getStructuringElement(
-                cv::MORPH_ELLIPSE,
-                cv::Size(config.kernelSize * 2 + 1, config.kernelSize * 2 + 1),
-                cv::Point(config.kernelSize, config.kernelSize));
-            cv::dilate(canniedImg, canniedImg, element);
+            
+        if (config.blurSize > 0 || config.kernelSize > 0) {
+            config.log("Blurring");
+            if (config.blurSize > 0) {
+                cv::GaussianBlur(
+                    canniedImg,
+                    canniedImg,
+                    cv::Size(config.blurSize * 2 + 1, config.blurSize * 2 + 1),
+                    0);
+                cv::threshold(canniedImg, canniedImg, 0, 255, cv::THRESH_BINARY);
+            }
+            if (config.kernelSize > 0) {
+                cv::Mat element = cv::getStructuringElement(
+                    cv::MORPH_ELLIPSE,
+                    cv::Size(config.kernelSize * 2 + 1, config.kernelSize * 2 + 1),
+                    cv::Point(config.kernelSize, config.kernelSize));
+                cv::dilate(canniedImg, canniedImg, element);
+            }
+            config.log("Done");
         }
-        config.log("Done");
+    } else {
+        canniedImg = cv::imread(config.cannyInputFilename, cv::IMREAD_GRAYSCALE);
+        cv::threshold(canniedImg, canniedImg, 0, 255, cv::THRESH_BINARY);
     }
 
     if (config.dbgCannyFilename != "") {
