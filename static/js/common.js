@@ -1,7 +1,6 @@
 "use strict";
 
-function changeCursor(prop) {
-    prop = prop || "default";
+function changeCursor(prop) { prop = prop || "default";
     $("body").css("cursor", prop);
 }
 
@@ -397,7 +396,8 @@ var WarpRenderer = function (root, _warp_id, rectCtrl) {
                     ),
                     $("<input type='submit' value='Update'>")
                 ),
-                $("<button class='btn-warp-ocr'>OCR</button>")
+                $("<button class='btn-warp-ocr'>OCR</button>"),
+                $("<button class='btn-warp-remove'>Remove</button>")
             );
             this.cropperRenderer = CropperRenderer($cropper, state.warp_id).ready();
         },
@@ -406,6 +406,10 @@ var WarpRenderer = function (root, _warp_id, rectCtrl) {
             this._fillLi($root);
             $root.find(".btn-warp-ocr").click(function () {
                 this_.ocr();
+            });
+            $root.find(".btn-warp-remove").click(function () {
+                this_.remove();
+                this_.$root.remove();
             });
             var $form = $root.find(".opt-form");
             $form.submit(function (ev) {
@@ -517,7 +521,7 @@ var WarpRenderer = function (root, _warp_id, rectCtrl) {
         },
         remove: function () {
             var warp_id = this.state.warp_id;
-            $root.remove();
+            this.$root.remove();
             $.ajax({
                 url: "/warp/" + warp_id,
                 method: "DELETE"
@@ -892,8 +896,6 @@ var mainRenderer = SimpleStateRenderer({
 
                         var subrenderer = WarpRenderer($li, warp_id, {
                             get: function (warp_id) {
-                                console.log("RECTS>>");
-                                console.log(this_.state.rects);
                                 return this_.findByWarpId(warp_id);
                             },
                             remove: function (warp_id) {

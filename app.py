@@ -141,7 +141,7 @@ def warp():
 
     try:
         if thr_method in ('naive', 'otsu'):
-            thr_type = cv2.THRESH_BINARY
+            thr_type = cv2.THRESH_BINARY_INV
             if thr_method == 'otsu':
                 thresh = 255
                 thr_type |= cv2.THRESH_OTSU
