@@ -54,9 +54,13 @@ def index():
 @app.route("/canny", methods=['GET', 'POST'])
 def canny():
     if request.method == 'POST':
-        canny_level = request.form.get("canny_level", picture_taker.canny_level, type=int)
-        blur_size = request.form.get("blur_size", picture_taker.blur_size, type=int)
-        kernel_size = request.form.get("kernel_size", picture_taker.kernel_size, type=int)
+        json = request.get_json()
+        try:
+            canny_level = int(json.get("canny_level", picture_taker.canny_level))
+            blur_size = int(json.get("blur_size", picture_taker.blur_size))
+            kernel_size = int(json.get("kernel_size", picture_taker.kernel_size))
+        except ValueError:
+            fl.abort(400)
         picture_taker.set_canny(canny_level, blur_size, kernel_size)
 
     return fl.jsonify(
@@ -132,7 +136,7 @@ def warp():
     height, width = img.shape[:2]
 
     if rot_deg != 0:
-        M = cv2.getRotationMatrix2D((width / 2, height / 2), rot_deg, 1.0)
+        M = cv2.getRotationMatrix2D((width / 2, height / 2), -rot_deg, 1.0)
         img = cv2.warpAffine(img, M, (width, height))
 
     try:
@@ -232,13 +236,14 @@ def ocr(warp_id):
                       f.name,
                       "-o",
                       "-",
-                      "-block"])
+                      "-block"],
+                     stdout=PIPE)
         buf = u"".join([line.decode("utf-8")
                         for line in proc.stdout])
         proc.wait()
     buf = u"\n".join(buf.splitlines())
     content = buf
-    translated = ja_ko_translator(content)
+    _, translated = ja_ko_translator(content)
 
     return fl.jsonify(
         content=content,
