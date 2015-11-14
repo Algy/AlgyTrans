@@ -92,7 +92,50 @@ def filter_hira_so(s):
     
 
 def filter_ij(s):
-    return s.replace(u"ij", u"\u3044").replace(u"lj", u"\u3044").replace(u"fl", u"\u3066")
+    return (s
+        .replace(u"ij", u"\u3044")
+        .replace(u"lj", u"\u3044")
+        .replace(u"``", u"\u3044")
+        .replace(u'l`', u"\u3044")
+        .replace(u"fl", u"\u3066")
+        .replace(u"lf", u"\u3052")
+    )
+
+def filter_weird_opening_braket(s, op, cl):
+    # japanese opening bracket -> hiragana ku
+    if not s:
+        return s
+    toklst = s.split(op)
+    result = [toklst[0]]
+    toklst = toklst[1:]
+    for idx, tok in enumerate(toklst):
+        clbrk_pos = tok.find(cl)
+        endl_pos = tok.find(u'\n')
+        if endl_pos == -1 and idx == (len(toklst) - 1):
+            endl_pos = len(tok) - 1
+
+        if clbrk_pos == -1 or clbrk_pos > endl_pos:
+            result.append(u"\u304f")
+        else:
+            result.append(op)
+        result.append(tok)
+    return u''.join(result)
+
+def filter_person_counting(s):
+    return (s
+        .replace(u'\u30fc\u4eba', u'\u4e00\u4eba')
+        .replace(u'\u30cb\u4eba', u'\u4e8c\u4eba')
+    )
+
+# xfilter: when false positive is possible
+def xfilter_kata_idiom(s):
+    return (s
+        .replace(u'\u30cb\u30d2', u'\u3053\u3068')
+    )
+            
+def filter_chock(s):
+    # TODO
+    return s
 
 def correct(s):
     s = filter_space(s)
@@ -102,4 +145,8 @@ def correct(s):
     s = filter_kata_no(s)
     s = filter_hira_so(s)
     s = filter_ij(s)
+    s = filter_weird_opening_braket(s, u'\u3008', u'\u3009')
+    s = filter_person_counting(s)
+    s = filter_chock(s)
+    s = xfilter_kata_idiom(s)
     return s

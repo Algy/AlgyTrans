@@ -16,7 +16,7 @@ OPTIONS = ["-w", "1200",
            "-t", "0",
            "-v",
            "-ss", "128000",
-           "-ISO", "100",
+           "-ISO", "50",
            "--sharpness", "100",
            ]
 FILE_PATH = '/dev/shm/arand/mn.jpg'

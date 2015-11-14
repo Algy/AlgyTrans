@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import sys
 import os
 import uuid
 import flask as fl
@@ -10,6 +11,7 @@ import cv2
 from tempfile import NamedTemporaryFile
 from flask import request
 from trans import build_trans
+from corrector import correct
 from subprocess import Popen, PIPE, check_output
 from video.taker import PictureTaker, FILE_PATH, CANNY_FILE_PATH
 from croppers.persp import persp_warp, order_points
@@ -242,11 +244,12 @@ def ocr(warp_id):
                         for line in proc.stdout])
         proc.wait()
     buf = u"\n".join(buf.splitlines())
-    content = buf
-    _, translated = ja_ko_translator(content)
+    content = correct(buf)
+    print content.encode("utf-8")
+    annotated, translated = ja_ko_translator(content)
 
     return fl.jsonify(
-        content=content,
+        content=annotated,
         translated=translated
     )
 
