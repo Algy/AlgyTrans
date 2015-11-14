@@ -1,28 +1,29 @@
 {% extends "base.html" %}
 {% block body %}
-{# Here's for rectangle selector #}
 <div class='rect-canvas-wrapper'>
-    <ul class='tool-selector'>
-        <li class='active'><a class='tool-floodfill' href='#'>FloodFill</a></li>
-        <li><a class='tool-drop' href='#'>Drop Rectangle</a></li>
-        <li><a class='tool-move' href='#'>Move</a></li>
-    </ul>
-    <div><a class='tool-clear' href='#'>Clear</a></div>
-    <img class='mn-image' src='/mn.jpg' style='display: none'>
-    <canvas class='rect-canvas' width='1200' height='800'></canvas>
-    <ul class='warp-list'>
-        <li data-warp-id=''>
-            <img class='warp-image' href='//placehold.it/500x200'>
-            <button class='btn-warp-update'>Update</button>
-            <button class='btn-ocr'>OCR</button>
-            <div class='src-lang'>
-                Japanese
-            </div>
-            <div class='dest-lang'>
-                Korean
-            </div>
-        </li>
-    </ul>
+    <div class='canny-wrapper'>
+        <img class='mn-canny-image' src='/mn_canny.jpg'>
+        <form class='opt-form'>
+            <label>Canny Level</label>
+            <input type='text' name='canny-level'>
+            <input type='text' name='kernel-size'>
+            <input type='text' name='blur-size'>
+            <input type='submit' value='Change'>
+        </form>
+    </div>
+    <div class='rect-canvas-wrapper'>
+        <div class='canvas-wrapper'>
+            <ul class='tool-selector'>
+                <li class='active' data-tool='floodfill'><a href='#'>FloodFill</a></li>
+                <li data-tool='drop'><a href='javascript:;'>Drop Rectangle</a></li>
+                <li data-tool='move'><a href='javascript:;'>Move</a></li>
+            </ul>
+            <img class='mn-image' src='/mn.jpg' style='display: none'>
+            <canvas class='rect-canvas' width='1200' height='800'></canvas>
+        </div>
+        <div><a class='build-warps' href='javascript:;'>Build</a></div>
+        <div><a class='clear-warps' href='javascript:;'>Clear</a></div>
+        <ul class='warp-list'></ul>
+    </div>
 </div>
-<img class='canny' href='/mn_canny.jpg'>
 {% endblock %}

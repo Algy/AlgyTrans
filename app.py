@@ -71,11 +71,10 @@ def canny():
 def floodfill():
     json = request.get_json()
     try:
-        seed_points = json["points"]
-        for point in seed_points:
-            assert (len(point) == 2 and
-                    all(isinstance(n, (int, long))
-                        for n in point))
+        point = json["point"]
+        assert (len(point) == 2 and
+                all(isinstance(n, (int, long))
+                    for n in point))
     except (TypeError, KeyError, ValueError, AssertionError):
         fl.abort(400)
 
@@ -85,14 +84,12 @@ def floodfill():
             "--input", FILE_PATH,
             "--canny-input", CANNY_FILE_PATH,
             "--pinpoint-range", "255,255,255:255,255,255",
-            "--seed-point", 
-            ":".join((",".join(str(n) for n in pt))
-                     for pt in seed_points)]
+            "--seed-point", ",".join(str(n) for n in point)]
     buf = check_output(argv)
     rects = parse_detector_output(buf)
 
     return fl.jsonify(
-        result=map(lambda x: x.tolist(), rects)
+        rects=map(lambda x: x.tolist(), rects)
     )
 
 
@@ -104,7 +101,7 @@ def warp():
         rotation: <degrees>,
         threshold: {
             method: "naive", "otsu" or "adaptive"
-            value: float
+            value: float or {C: int, block_size: int}
         }
 
     Output -
@@ -213,7 +210,7 @@ def ocr(warp_id):
     '''
 
     img_path = get_warp_image_path(warp_id) 
-    img = cv2.imread(img_path)
+    img = cv2.imread(img_path, flags=cv2.IMREAD_GRAYSCALE)
     if img is None:
         fl.abort(404)
 
@@ -232,16 +229,12 @@ def ocr(warp_id):
     with NamedTemporaryFile(suffix='.ppm') as f:
         cv2.imwrite(f.name, img)
         proc = Popen([os.path.join(CURRENT_DIRECTORY, "nhocr"),
+                      f.name,
                       "-o",
                       "-",
-                      f.name,
                       "-block"])
-        buf = u""
-        while True:
-            line = proc.stdout.readline().decode("utf-8")
-            if not line:
-                break
-            buf += line
+        buf = u"".join([line.decode("utf-8")
+                        for line in proc.stdout])
         proc.wait()
     buf = u"\n".join(buf.splitlines())
     content = buf
