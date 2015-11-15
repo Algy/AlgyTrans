@@ -3,6 +3,12 @@
 <header>
     <div class='container'>
         <h1> AlgyTrans </h1>
+        <ul class='header-tool-selector'>
+            <li><a href='#'></a></li>
+            <li><a href='#'>Texts</a></li>
+            <li><a href='#'>Settings</a></li>
+            <li><a href='#'>AutoSelect Setting</a></li>
+        </ul>
     </div>
 </header>
 <div class='container main-container'>
@@ -19,16 +25,21 @@
     <div class='rect-canvas-wrapper'>
         <div class='canvas-wrapper'>
             <ul class='tool-selector'>
-                <li class='active' data-tool='floodfill'><a href='javascript:;'>FloodFill</a></li>
+                <li class='active' data-tool='floodfill'><a href='javascript:;'>AutoSelect</a></li>
                 <li data-tool='drag'><a href='javascript:;'>Drag</a></li>
                 <li data-tool='move'><a href='javascript:;'>Move</a></li>
             </ul>
+            <div class='stat'>
+                <span class='rect-count'>12</span>
+                <a class='clear-warps' href='javsacript:;'>&#10006;</a>
+            </div>
             <img class='mn-image' src='/mn.jpg' style='display: none'>
             <canvas class='rect-canvas' width='1200' height='800'></canvas>
             <a class='build-warps' href='javascript:;'>Build</a>
-            <a class='clear-warps' href='javascript:;'>Clear</a>
         </div>
         <ul class='warp-list'></ul>
     </div>
 </div>
+<aside class='warp-side-bar'>
+</aside>
 {% endblock %}

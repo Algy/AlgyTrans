@@ -1,0 +1,139 @@
+/* http://meyerweb.com/eric/tools/css/reset/ 
+   v2.0 | 20110126
+License: none (public domain)
+ */
+
+html, body, div, span, applet, object, iframe,
+    h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+    a, abbr, acronym, address, big, cite, code,
+    del, dfn, em, img, ins, kbd, q, s, samp,
+    small, strike, strong, sub, sup, tt, var,
+    b, u, i, center,
+    dl, dt, dd, ol, ul, li,
+    fieldset, form, label, legend,
+    table, caption, tbody, tfoot, thead, tr, th, td,
+    article, aside, canvas, details, embed, 
+    figure, figcaption, footer, header, hgroup, 
+    menu, nav, output, ruby, section, summary,
+    time, mark, audio, video {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-size: 100%;
+    font: inherit;
+    vertical-align: baseline;
+}
+
+/* HTML5 display-role reset for older browsers */
+article, aside, details, figcaption, figure, footer, header, hgroup, menu, nav, section {
+    display: block;
+}
+body {
+    line-height: 1;
+}
+ol, ul {
+    list-style: none;
+}
+blockquote, q {
+    quotes: none;
+}
+blockquote:before, blockquote:after,
+    q:before, q:after {
+    content: '';
+    content: none;
+}
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+/* reset.css END */
+
+header {
+    padding-top: 15px;
+    padding-bottom: 15px;
+    background-color: #777777;
+
+    border-bottom: 2px solid #cccccc;
+    margin-bottom: 16px;
+}
+
+header h1 {
+    color: white;
+    font-size: 24px;
+    font-size: bold;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.rect-canvas-wrapper .canvas-wrapper {
+    position: relative;
+}
+
+.rect-canvas-wrapper .canvas-wrapper .tool-selector {
+    overflow: hidden;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.rect-canvas-wrapper .canvas-wrapper .tool-selector > li {
+    float: left;
+}
+
+.rect-canvas-wrapper .canvas-wrapper .tool-selector > li > a {
+    display: inline-block;
+    text-decoration: none;
+    color: #efefef;
+    text-shadow: 2px 2px rgba(0, 0, 0, 0.28);
+    padding: 20px;
+    font-size: 18px;
+    margin-right: 2px;
+}
+
+.rect-canvas-wrapper .canvas-wrapper .tool-selector > li.active > a {
+    background: rgba(0, 0, 0, 0.38);
+}
+
+.rect-canvas-wrapper .canvas-wrapper .tool-selector > li > a:hover {
+    background: rgba(0, 0, 0, 0.38);
+}
+
+.rect-canvas-wrapper .canvas-wrapper .build-warps,.clear-warps {
+    text-decoration: none;
+}
+
+.rect-canvas-wrapper .canvas-wrapper .stat {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    font-size: 24px;
+}
+.rect-canvas-wrapper .canvas-wrapper .stat > * {
+    vertical-align: middle;
+}
+
+.rect-canvas-wrapper .canvas-wrapper .stat .rect-count {
+    color: white;
+}
+
+.rect-canvas-wrapper .canvas-wrapper .stat .clear-warps {
+    color: white;
+    font-weight: bold;
+    text-shadow: 0px 0px 2px rgba(0, 0, 0, 0.28);
+    padding: 6px 6px;
+    font-size: 32px;
+    opacity: 0.3;
+    cursor: default;
+}
+
+.rect-canvas-wrapper .canvas-wrapper .stat .clear-warps.active {
+    opacity: 1;
+    cursor: pointer;
+}
+
+.rect-canvas-wrapper .canvas-wrapper .stat .clear-warps.active:hover {
+    text-shadow: 0px 0px 12px rgba(0, 0, 0, 0.28);
+}

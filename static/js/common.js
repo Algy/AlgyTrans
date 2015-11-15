@@ -635,7 +635,7 @@ var cannyRenderer = SimpleStateRenderer({
     }
 });
 
-var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getContainer) {
+var CanvasRenderer = function (root, proxy) {
     var floodFillTool = {
         begin: function (renderer) {
             this.renderer = renderer;
@@ -665,7 +665,7 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
                             warp_id: null,
                             points: this
                         };
-                        addRect(rect);
+                        proxy.addRect(rect);
                     });
                     if (data.rects.length > 0) {
                         this_.renderer.changeTool("move");
@@ -684,7 +684,7 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
         },
         down: function (pos) {
             this.initialPos = pos;
-            this.rect = addRect({
+            this.rect = proxy.addRect({
                 points: [
                     [pos.x, pos.y],
                     [pos.x, pos.y],
@@ -711,7 +711,7 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
         },
         up: function (pos) {
             if (Math.min(Math.abs(pos.x - this.initialPos.x), Math.abs(pos.y - this.initialPos.y)) < 10) {
-                removeRect(this.rect);
+                proxy.removeRect(this.rect);
                 this.rect = null;
                 return;
             }
@@ -732,10 +732,10 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
         initialRectPoints: null,
         down: function (pos) {
             var pointProxy, containerRect, initialRectPoints;
-            if ((pointProxy  = nearest(pos)) != null) {
+            if ((pointProxy  = proxy.nearest(pos)) != null) {
                 this.pointProxy = pointProxy;
                 changeCursor("pointer");
-            } else if ((containerRect = getContainer(pos)) != null) {
+            } else if ((containerRect = proxy.getContainer(pos)) != null) {
                 this.containerRect = containerRect;
                 this.initialPos = pos;
                 this.initialRectPoints = initialRectPoints = [];
@@ -745,10 +745,10 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
             }
         },
         rdown: function (pos) {
-            var containerRect = getContainer(pos);
+            var containerRect = proxy.getContainer(pos);
             if (containerRect == null)
                 return;
-            removeRect(containerRect);
+            proxy.removeRect(containerRect);
             this.renderer.invalidate();
         },
         up: function () {
@@ -760,9 +760,9 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
         },
         hover: function (pos) {
             var contRect, pointProxy;
-            if ((pointProxy = nearest(pos)) != null) {
+            if ((pointProxy = proxy.nearest(pos)) != null) {
                 changeCursor("pointer");
-            } else if ((contRect = getContainer(pos)) != null) {
+            } else if ((contRect = proxy.getContainer(pos)) != null) {
                 changeCursor("move");
             } else {
                 changeCursor();
@@ -814,6 +814,11 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
             this.$canvas = $root.find(".rect-canvas");
             this.ctx = this.$canvas[0].getContext("2d");
 
+            $root.find(".clear-warps").click(function () {
+                proxy.clearRects();
+                this_.invalidate();
+            });
+
             this.$canvas.contextmenu(function (ev) {
                 ev.preventDefault();
                 ev.stopPropagation();
@@ -857,9 +862,18 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
         },
         renderAll: function ($root) {
             var this_ = this;
+
+            var rectCount = proxy.getRects().length;
+            $root.find(".rect-count").text(
+                rectCount + " area" + (rectCount >= 2? "s": ""));
+            if (rectCount > 0)
+                $root.find(".clear-warps").addClass("active");
+            else
+                $root.find(".clear-warps").removeClass("active");
+
             var ctx = this_.ctx;
             ctx.drawImage(this.$image[0], 0, 0);
-            $(rects).each(function() {
+            $(proxy.getRects()).each(function() {
                 var rect = this;
                 ctx.beginPath();
                 for (var idx = 0; idx < 4; idx++) {
@@ -885,49 +899,40 @@ var mainRenderer = SimpleStateRenderer({
     state: {
         rects: [] // {points: int array array, warp_id: null or string} array
     },
+    getRects: function () {
+        return this.state.rects;
+    },
+    addRect: function (rect) {
+        if (!("warp_id" in rect)) {
+            rect["warp_id"] = null;
+        }
+        this.state.rects.push(rect);
+        return rect;
+    },
+    makeProxy: function () {
+        var this_ = this;
+        var result = {};
+        $(arguments).each(function () {
+            var methodName = this;
+            result[methodName] = function () {
+                return this_[methodName].apply(this_, arguments);
+            };
+        });
+        return result;
+    },
     didReady: function ($root) {
         var this_ = this;
-        this.canvasRenderer = CanvasRenderer($root.find(".canvas-wrapper"), 
-            // rects
-            this_.state.rects,
-            // addRect
-            function (rect) {
-                this_.state.rects.push(rect);
-                return rect;
-            },
-            // removeRect
-            function (rect) {
-                var rects = this_.state.rects;
-                var destIdx;
-                $(rects).each(function (idx) {
-                    if (rect === this) {
-                        destIdx = idx;
-                    }
-                });
-                if (destIdx != null) {
-                    rects.splice(destIdx, 1);
-                    if (rect.warp_id != null) {
-                        var sr = this_.subrenderers[rect.warp_id];
-                        if (sr) {
-                            sr.remove();
-                            delete this_.subrenderers[rect.warp_id];
-                        }
-                    }
-                }
-            },
-            // nearest
-            function () {
-                return this_.nearest.apply(this_, arguments);
-            },
-            // getContainer
-            function () {
-                return this_.getContainer.apply(this_, arguments);
-            }
+        this.canvasRenderer = CanvasRenderer(
+            $root.find(".canvas-wrapper"),
+            this_.makeProxy(
+                "getRects",
+                "addRect",
+                "removeRect",
+                "clearRects",
+                "nearest",
+                "getContainer")
         ).ready();
-        $root.find(".clear-warps").click(function () {
-            this_.clearRects();
-            this_.canvasRenderer.invalidate();
-        });
+
         $root.find(".build-warps").click(function () {
             this_.syncAll(function () {
                 this_.invalidate();
@@ -1023,6 +1028,26 @@ var mainRenderer = SimpleStateRenderer({
         for (var idx = 0; idx < rects.length; idx++) {
             if (rects[idx].warp_id === warp_id) {
                 return rects[idx];
+            }
+        }
+    },
+    removeRect: function (rect) {
+        var this_ = this;
+        var rects = this_.state.rects;
+        var destIdx;
+        $(rects).each(function (idx) {
+            if (rect === this) {
+                destIdx = idx;
+            }
+        });
+        if (destIdx != null) {
+            rects.splice(destIdx, 1);
+            if (rect.warp_id != null) {
+                var sr = this_.subrenderers[rect.warp_id];
+                if (sr) {
+                    sr.remove();
+                    delete this_.subrenderers[rect.warp_id];
+                }
             }
         }
     },
