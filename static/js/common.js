@@ -643,6 +643,9 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
         hover: function ( ) {
             changeCursor("crosshair");
         },
+        up: function () {
+            changeCursor();
+        },
         down: function (pos) {
             var this_ = this;
             changeCursor("wait");
@@ -675,7 +678,7 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
     };
 
     
-    var dropTool = {
+    var dragTool = {
         begin: function (renderer) {
             this.renderer = renderer;
         },
@@ -707,6 +710,11 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
             this.renderer.invalidate();
         },
         up: function (pos) {
+            if (Math.min(Math.abs(pos.x - this.initialPos.x), Math.abs(pos.y - this.initialPos.y)) < 10) {
+                removeRect(this.rect);
+                this.rect = null;
+                return;
+            }
             this.rect = null;
             this.renderer.changeTool("move");
         },
@@ -787,7 +795,7 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
 
     var toolDict = {
         floodfill: floodFillTool,
-        drop: dropTool,
+        drag: dragTool,
         move: moveTool
     };
 
@@ -813,8 +821,6 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
 
             this.changeTool("floodfill");
             $root.find(".tool-selector > li").click(function () {
-                $root.find(".tool-selector > li").removeClass("active");
-                $(this).addClass("active");
                 this_.changeTool($(this).attr("data-tool"));
             });
             var getHandler = function (handlerName) {
@@ -841,6 +847,8 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
         },
         changeTool: function (newtool) {
             var obj = toolDict[this.state.toolName];
+            this.$root.find(".tool-selector > li").removeClass("active");
+            this.$root.find(".tool-selector > li[data-tool='" + newtool + "']").addClass("active");
             if (this.state.toolName)
                 obj.end(this);
             this.state.toolName = newtool;

@@ -1,28 +1,33 @@
 {% extends "base.html" %}
 {% block body %}
-<div class='rect-canvas-wrapper'>
-    <div class='canny-wrapper'>
+<header>
+    <div class='container'>
+        <h1> AlgyTrans </h1>
+    </div>
+</header>
+<div class='container main-container'>
+    <div class='canny-wrapper' style="display: none">
         <img class='mn-canny-image' src='/mn_canny.jpg'>
         <form class='opt-form'>
             <label>Canny Level</label>
             <input type='text' name='canny-level'>
             <input type='text' name='kernel-size'>
             <input type='text' name='blur-size'>
-            <input type='submit' value='Change'>
+            <input type='submit' value='Update'>
         </form>
     </div>
     <div class='rect-canvas-wrapper'>
         <div class='canvas-wrapper'>
             <ul class='tool-selector'>
                 <li class='active' data-tool='floodfill'><a href='javascript:;'>FloodFill</a></li>
-                <li data-tool='drop'><a href='javascript:;'>Drop Rectangle</a></li>
+                <li data-tool='drag'><a href='javascript:;'>Drag</a></li>
                 <li data-tool='move'><a href='javascript:;'>Move</a></li>
             </ul>
             <img class='mn-image' src='/mn.jpg' style='display: none'>
             <canvas class='rect-canvas' width='1200' height='800'></canvas>
+            <a class='build-warps' href='javascript:;'>Build</a>
+            <a class='clear-warps' href='javascript:;'>Clear</a>
         </div>
-        <div><a class='build-warps' href='javascript:;'>Build</a></div>
-        <div><a class='clear-warps' href='javascript:;'>Clear</a></div>
         <ul class='warp-list'></ul>
     </div>
 </div>
