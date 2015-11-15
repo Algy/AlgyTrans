@@ -1,11 +1,47 @@
 "use strict";
 
+function lsolve2by2(A, v) {
+    var a11 = A[0],
+        a12 = A[1],
+        a21 = A[2],
+        a22 = A[3];
+    var det = a11 * a22 - a12 * a21;
+    var b1 = v[0],
+        b2 = v[1];
+    if (Math.abs(det) <= 0.001) {
+        // TODO
+        return undefined;
+    }
+
+    return [
+        (a22 * b1 - a12 * b2) / det,
+        (-a21 * b1 + a11 * b2) / det
+    ];
+}
+
 function changeCursor(prop) { prop = prop || "default";
     $("body").css("cursor", prop);
 }
 
 function cacheBuster(str) {
     return str + "?" + (new Date()).getTime();
+}
+
+function CallbackJoint(callback) {
+    var N = 0, r = 0;
+    return {
+        register: function () {
+            N++;
+        },
+        build: function () {
+            return function () {
+                if (++r == N) {
+                    if (callback)
+                        callback();
+                }
+            };
+        }
+    };
 }
 
 $.fn.setSrc = function (src, callback) {
@@ -434,7 +470,7 @@ var WarpRenderer = function (root, _warp_id, rectCtrl) {
         },
         updateWarpId: function (callback) {
             var this_ = this;
-            var $form = $(this.root).find(".opt-form");
+            var $form = this.$root.find(".opt-form");
             var rect = rectCtrl.get(this.state.warp_id);
 
             var getField = function (name) {
@@ -593,7 +629,7 @@ var cannyRenderer = SimpleStateRenderer({
     }
 });
 
-var CanvasRenderer = function (root, getRects, addRect, nearest) {
+var CanvasRenderer = function (root, getRects, addRect, nearest, getContainer) {
     var floodFillTool = {
         begin: function (renderer) {
             this.renderer = renderer;
@@ -632,20 +668,34 @@ var CanvasRenderer = function (root, getRects, addRect, nearest) {
             this.renderer = renderer;
         },
         down: function (pos) {
-            var top = Math.max(pos.x - 20, 0);
-            var left = Math.max(pos.y - 20, 0);
-            var bottom = top + 40,
-                right = left + 40;
-            addRect({
+            this.initialPos = pos;
+            this.rect = addRect({
                 points: [
-                    [top, left],
-                    [top, right],
-                    [bottom, right],
-                    [bottom, left]
+                    [pos.x, pos.y],
+                    [pos.x, pos.y],
+                    [pos.x, pos.y],
+                    [pos.x, pos.y],
                 ],
                 warp_id: null
             });
             this.renderer.invalidate();
+        },
+        scratch: function (pos) {
+            var left = Math.min(pos.x, this.initialPos.x);
+            var top = Math.min(pos.y, this.initialPos.y);
+            var right = Math.max(pos.x, this.initialPos.x);
+            var bottom = Math.max(pos.y, this.initialPos.y);
+
+            this.rect.points = [
+                [left, top],
+                [right, top],
+                [right, bottom],
+                [left, bottom]
+            ];
+            this.renderer.invalidate();
+        },
+        up: function (pos) {
+            this.rect = null;
         },
         end: function () {
         }
@@ -656,21 +706,35 @@ var CanvasRenderer = function (root, getRects, addRect, nearest) {
             this.renderer = renderer;
         },
         pointProxy: null,
+        containerRect: null,
+        initialPos: null,
+        initialRectPoints: null,
         down: function (pos) {
-            var pointProxy = nearest(pos);
-            if (pointProxy != null) {
+            var pointProxy, containerRect, initialRectPoints;
+            if ((pointProxy  = nearest(pos)) != null) {
                 this.pointProxy = pointProxy;
                 changeCursor("pointer");
+            } else if ((containerRect = getContainer(pos)) != null) {
+                this.containerRect = containerRect;
+                this.initialPos = pos;
+                this.initialRectPoints = initialRectPoints = [];
+                $(containerRect.points).each(function () {
+                    initialRectPoints.push([this[0], this[1]]);
+                });
             }
         },
         up: function () {
             this.pointProxy = null;
+            this.initialPos = null;
+            this.initialRectPoints = null;
             changeCursor();
         },
         hover: function (pos) {
-            var pointProxy = nearest(pos);
-            if (pointProxy != null) {
+            var contRect, pointProxy;
+            if ((pointProxy = nearest(pos)) != null) {
                 changeCursor("pointer");
+            } else if ((contRect = getContainer(pos)) != null) {
+                changeCursor("move");
             } else {
                 changeCursor();
             }
@@ -678,6 +742,20 @@ var CanvasRenderer = function (root, getRects, addRect, nearest) {
         scratch: function (pos) {
             if (this.pointProxy) {
                 this.pointProxy.attr(pos);
+                this.renderer.invalidate();
+            } else if (this.containerRect) {
+                var deltaX = pos.x - this.initialPos.x,
+                    deltaY = pos.y - this.initialPos.y;
+                this.containerRect.points = [
+                    [this.initialRectPoints[0][0] + deltaX,
+                     this.initialRectPoints[0][1] + deltaY],
+                    [this.initialRectPoints[1][0] + deltaX,
+                     this.initialRectPoints[1][1] + deltaY],
+                    [this.initialRectPoints[2][0] + deltaX,
+                     this.initialRectPoints[2][1] + deltaY],
+                    [this.initialRectPoints[3][0] + deltaX,
+                     this.initialRectPoints[3][1] + deltaY]
+                ];
                 this.renderer.invalidate();
             }
         },
@@ -782,10 +860,15 @@ var mainRenderer = SimpleStateRenderer({
             // addRect
             function (rect) {
                 this_.state.rects.push(rect);
+                return rect;
             },
             // nearest
             function () {
                 return this_.nearest.apply(this_, arguments);
+            },
+            // getContainer
+            function () {
+                return this_.getContainer.apply(this_, arguments);
             }
         ).ready();
         $root.find(".clear-warps").click(function () {
@@ -793,20 +876,11 @@ var mainRenderer = SimpleStateRenderer({
             this_.canvasRenderer.invalidate();
         });
         $root.find(".build-warps").click(function () {
-            this_.buildAll(function () {
+            this_.syncAll(function () {
                 this_.invalidate();
                 this_.canvasRenderer.invalidate();
             });
         });
-    },
-    unlinkRects: function () {
-        var $warpList = $(this.root).find(".warp-list");
-        $warpList.empty();
-        $(this.state.rects).each(function () { this.warp_id = null; });
-        for (var key in this.subrenderer) {
-            this.subrenderers[key].remove();
-        }
-        this.subrenderers = {};
     },
     clearRects: function () {
         // This function doesn't invoke invalidate()
@@ -820,6 +894,37 @@ var mainRenderer = SimpleStateRenderer({
         this.subrenderers = {};
     },
     DETECT_RADIUS: 25,
+    getContainer: function (pos) {
+        var rects = this.state.rects;
+        for (var idx = 0; idx < rects.length; idx++) {
+            var rect = rects[idx];
+
+            var success = false;
+            for (var accessor = 0; accessor < 4; accessor += 2) {
+                var pt1 = rect.points[accessor];
+                var pt2 = rect.points[accessor + 1];
+                var pt3 = rect.points[(accessor + 2) % 4];
+
+                var sol = lsolve2by2(
+                    [pt1[0] - pt2[0], pt3[0] - pt2[0],
+                     pt1[1] - pt2[1], pt3[1] - pt2[1]],
+                    [pos.x - pt2[0],
+                     pos.y - pt2[1]]
+                );
+                if (sol != null &&
+                    sol[0] >= 0 &&
+                    sol[1] >= 0 &&
+                    sol[0] + sol[1] <= 1) {
+                    success = true;
+                    break;
+                }
+            }
+
+            if (success) {
+                return rect;
+            }
+        }
+    },
     nearest: function (pos) {
         var LIMIT_2 = this.DETECT_RADIUS * this.DETECT_RADIUS;
 
@@ -868,56 +973,60 @@ var mainRenderer = SimpleStateRenderer({
             }
         }
     },
-    buildAll: function (complete) {
+    syncAll: function (complete) {
         var this_ = this;
         var rects = this.state.rects;
-        this.unlinkRects();
-        this.state.rects = rects;
-        var $warpList = this.$root.find(".warp-list");
 
-        function iter(rects, idx) {
-            if (idx < rects.length) {
-                var rect = rects[idx];
-                $.ajax({
-                    url: "/warp",
-                    data: JSON.stringify({
-                        rect: rect.points,
-                        rotation: 0,
-                        threshold: {method: "otsu"}
-                    }),
-                    contentType: "application/json",
-                    method: "POST",
-                    success: function (data) {
-                        var warp_id = data.warp_id;
-                        var $li = $("<li>");
-                        $li.appendTo($warpList);
+        var joint = CallbackJoint(complete);
 
-                        rect.warp_id = warp_id;
+        $(rects).filter(function () { 
+            return !(this.warp_id in this_.subrenderers);
+        }).each(function () {
+            var rect = this;
+            joint.register();
 
-                        var subrenderer = WarpRenderer($li, warp_id, {
-                            get: function (warp_id) {
-                                return this_.findByWarpId(warp_id);
-                            },
-                            remove: function (warp_id) {
-                                delete this_.subrenderers[warp_id];
-                                this_.state.rects = $(this_.state.rects).filter(function () {
-                                    return this.warp_id != warp_id;
-                                }).toArray();
-                            }
-                        });
-                        subrenderer.ready();
-                        this_.subrenderers[warp_id] = subrenderer;
-                    },
-                    complete: function () {
-                        iter(rects, idx + 1);
-                    }
-                });
+            var $warpList = this_.$root.find(".warp-list");
+            $.ajax({
+                url: "/warp",
+                data: JSON.stringify({
+                    rect: rect.points,
+                    rotation: 0,
+                    threshold: {method: "otsu"}
+                }),
+                contentType: "application/json",
+                method: "POST",
+                success: function (data) {
+                    var warp_id = data.warp_id;
+                    var $li = $("<li>");
+                    $li.appendTo($warpList);
+
+                    rect.warp_id = warp_id;
+
+                    var subrenderer = WarpRenderer($li, warp_id, {
+                        get: function (warp_id) {
+                            return this_.findByWarpId(warp_id);
+                        },
+                        remove: function (warp_id) {
+                            delete this_.subrenderers[warp_id];
+                            this_.state.rects = $(this_.state.rects).filter(function () {
+                                return this.warp_id != warp_id;
+                            }).toArray();
+                        }
+                    });
+                    subrenderer.ready();
+                    this_.subrenderers[warp_id] = subrenderer;
+                },
+                complete: joint.build()
+            });
+        });
+        for (var warp_id in this_.subrenderers) {
+            if (this_.findByWarpId(warp_id) != null) {
+                joint.register();
+                this_.subrenderers[warp_id].updateWarpId(joint.build());
             } else {
-                if (complete)
-                    complete();
+                this_.subrenderers[warp_id].remove();
             }
         }
-        iter(rects, 0);
     }
 });
 
