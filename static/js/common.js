@@ -71,7 +71,9 @@ $.fn.detectMouse = function (opt) {
         scratch = opt.scratch,
         hover = opt.hover,
         down = opt.down,
-        up = opt.up;
+        rdown = opt.rdown,
+        up = opt.up,
+        rup = opt.rup;
 
     this.each(function () {
         var dom = this;
@@ -86,9 +88,14 @@ $.fn.detectMouse = function (opt) {
         };
         $node
             .mousedown(function (ev) {
-                pressingButton = true;
-                if (down)
-                    down.call(dom, getPos(ev));
+                if (ev.which === 1) {
+                    pressingButton = true;
+                    if (down)
+                        down.call(dom, getPos(ev));
+                } else if (ev.which === 3) {
+                    if (rdown)
+                        rdown.call(dom, getPos(ev));
+                }
             })
             .mousemove(function (ev) {
                 if (!pressingButton && hover)
@@ -99,9 +106,15 @@ $.fn.detectMouse = function (opt) {
                     move.call(dom, getPos(ev), pressingButton);
             });
         $("body").mouseup(function (ev) {
-            pressingButton = false;
-            if (up)
-                up.call(this, getPos(ev));
+            if (ev.which === 1) {
+                pressingButton = false;
+                if (up)
+                    up.call(this, getPos(ev));
+            } else if (ev.which === 3) {
+                if (rup) {
+                    rup.call(dom, getPos(ev));
+                }
+            }
         });
     });
     return this;
@@ -235,8 +248,6 @@ var CropperRenderer = function (root, _warp_id) {
                     if (lineCtrl == null)
                         return;
                     var val = lineCtrl.extract(pos);
-                    console.log(val);
-                    console.log("LEFT : " + this_.state.left);
                     lineCtrl.attr(val);
                     this_.invalidate();
                 },
@@ -298,7 +309,6 @@ var CropperRenderer = function (root, _warp_id) {
             } else if (attrName === 'bottom') {
                 counterAttrName = 'top';
             }
-            console.log("DIR " + attrName + "  COUNTER " + counterAttrName);
 
             return {
                 extract: function (pos) {
@@ -340,7 +350,6 @@ var CropperRenderer = function (root, _warp_id) {
                 state.bottom = height - 1;
                 state.initial = false;
 
-                console.log(state);
             }
             this.invalidate();
         },
@@ -387,8 +396,7 @@ var WarpRenderer = function (root, _warp_id, rectCtrl) {
             return this.state.warp_id;
         },
         renderAll: function ($root, state) {
-            var warp_id = state.warp_id,
-                threshold = state.threshold; 
+            var warp_id = state.warp_id;
             $root.attr("data-warp-id", state.warp_id);
         },
         _fillLi: function ($li) {
@@ -445,7 +453,6 @@ var WarpRenderer = function (root, _warp_id, rectCtrl) {
             });
             $root.find(".btn-warp-remove").click(function () {
                 this_.remove();
-                this_.$root.remove();
             });
             var $form = $root.find(".opt-form");
             $form.submit(function (ev) {
@@ -481,8 +488,6 @@ var WarpRenderer = function (root, _warp_id, rectCtrl) {
                 url: "/warp/" + this.state.warp_id,
                 method: "DELETE"
             });
-            console.log("ASD>> ");
-            console.log(rect);
             rect.warp_id = null;
             $.ajax({
                 url: "/warp",
@@ -520,6 +525,7 @@ var WarpRenderer = function (root, _warp_id, rectCtrl) {
         resync: function (warp_id) {
             this.state.warp_id = warp_id;
             this.cropperRenderer.resync(this.state.warp_id);
+            this.invalidate();
         },
         ocr: function () {
             var warp_id = this.getWarpId();
@@ -629,7 +635,7 @@ var cannyRenderer = SimpleStateRenderer({
     }
 });
 
-var CanvasRenderer = function (root, getRects, addRect, nearest, getContainer) {
+var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getContainer) {
     var floodFillTool = {
         begin: function (renderer) {
             this.renderer = renderer;
@@ -655,7 +661,10 @@ var CanvasRenderer = function (root, getRects, addRect, nearest, getContainer) {
                         };
                         addRect(rect);
                     });
-                    this_.renderer.invalidate();
+                    if (data.rects.length > 0) {
+                        this_.renderer.invalidate();
+                        this_.renderer.changeTool("move");
+                    }
                 }
             });
         },
@@ -696,6 +705,7 @@ var CanvasRenderer = function (root, getRects, addRect, nearest, getContainer) {
         },
         up: function (pos) {
             this.rect = null;
+            this.renderer.changeTool("move");
         },
         end: function () {
         }
@@ -722,6 +732,13 @@ var CanvasRenderer = function (root, getRects, addRect, nearest, getContainer) {
                     initialRectPoints.push([this[0], this[1]]);
                 });
             }
+        },
+        rdown: function (pos) {
+            var containerRect = getContainer(pos);
+            if (containerRect == null)
+                return;
+            removeRect(containerRect);
+            this.renderer.invalidate();
         },
         up: function () {
             this.pointProxy = null;
@@ -763,6 +780,7 @@ var CanvasRenderer = function (root, getRects, addRect, nearest, getContainer) {
         }
     };
 
+
     var toolDict = {
         floodfill: floodFillTool,
         drop: dropTool,
@@ -784,6 +802,11 @@ var CanvasRenderer = function (root, getRects, addRect, nearest, getContainer) {
             this.$canvas = $root.find(".rect-canvas");
             this.ctx = this.$canvas[0].getContext("2d");
 
+            this.$canvas.contextmenu(function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+            });
+
             this.changeTool("floodfill");
             $root.find(".tool-selector > li").click(function () {
                 $root.find(".tool-selector > li").removeClass("active");
@@ -799,7 +822,7 @@ var CanvasRenderer = function (root, getRects, addRect, nearest, getContainer) {
                 };
             };
             var args = {};
-            $(["move", "scratch", "hover", "down", "up"]).each(function () {
+            $(["move", "scratch", "hover", "down", "up", "rdown", "rup"]).each(function () {
                 args[this] = getHandler(this);
             });
             this.$canvas.detectMouse(args);
@@ -824,7 +847,7 @@ var CanvasRenderer = function (root, getRects, addRect, nearest, getContainer) {
             var this_ = this;
             var ctx = this_.ctx;
             ctx.drawImage(this.$image[0], 0, 0);
-            $(getRects()).each(function() {
+            $(rects).each(function() {
                 var rect = this;
                 ctx.beginPath();
                 for (var idx = 0; idx < 4; idx++) {
@@ -853,14 +876,32 @@ var mainRenderer = SimpleStateRenderer({
     didReady: function ($root) {
         var this_ = this;
         this.canvasRenderer = CanvasRenderer($root.find(".canvas-wrapper"), 
-            // getRects
-            function () {
-                return this_.state.rects;
-            },
+            // rects
+            this_.state.rects,
             // addRect
             function (rect) {
                 this_.state.rects.push(rect);
                 return rect;
+            },
+            // removeRect
+            function (rect) {
+                var rects = this_.state.rects;
+                var destIdx;
+                $(rects).each(function (idx) {
+                    if (rect === this) {
+                        destIdx = idx;
+                    }
+                });
+                if (destIdx != null) {
+                    rects.splice(destIdx, 1);
+                    if (rect.warp_id != null) {
+                        var sr = this_.subrenderers[rect.warp_id];
+                        if (sr) {
+                            sr.remove();
+                            delete this_.subrenderers[rect.warp_id];
+                        }
+                    }
+                }
             },
             // nearest
             function () {
