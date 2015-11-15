@@ -866,10 +866,13 @@ var CanvasRenderer = function (root, proxy) {
             var rectCount = proxy.getRects().length;
             $root.find(".rect-count").text(
                 rectCount + " area" + (rectCount >= 2? "s": ""));
-            if (rectCount > 0)
+            if (rectCount > 0) {
                 $root.find(".clear-warps").addClass("active");
-            else
+                $root.find(".build-warps").addClass("active");
+            } else {
                 $root.find(".clear-warps").removeClass("active");
+                $root.find(".build-warps").removeClass("active");
+            }
 
             var ctx = this_.ctx;
             ctx.drawImage(this.$image[0], 0, 0);
