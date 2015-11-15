@@ -640,9 +640,12 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
         begin: function (renderer) {
             this.renderer = renderer;
         },
+        hover: function ( ) {
+            changeCursor("crosshair");
+        },
         down: function (pos) {
             var this_ = this;
-            changeCursor("waiting");
+            changeCursor("wait");
             $.ajax({
                 url: "/floodfill",
                 method: 'POST',
@@ -662,8 +665,8 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
                         addRect(rect);
                     });
                     if (data.rects.length > 0) {
-                        this_.renderer.invalidate();
                         this_.renderer.changeTool("move");
+                        this_.renderer.invalidate();
                     }
                 }
             });
@@ -744,6 +747,7 @@ var CanvasRenderer = function (root, rects, addRect, removeRect, nearest, getCon
             this.pointProxy = null;
             this.initialPos = null;
             this.initialRectPoints = null;
+            this.containerRect = null;
             changeCursor();
         },
         hover: function (pos) {
